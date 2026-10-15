@@ -4,7 +4,7 @@ import java.util.Random;
 
 public class SwipeMessage {
     //    private static final String URL_PREFIX = "http://localhost:8080/ski-servlet/";
-    private static final String URL_PREFIX = "http://16.148.133.255:8080/ski-servlet/";
+    private static final String URL_PREFIX = "http://32.191.63.101:8080/ski-servlet/";
     private static final Random RANDOM = new Random();
 
     private final String body;

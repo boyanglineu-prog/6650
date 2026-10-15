@@ -27,14 +27,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SwipeClient {
     private static final int SC_CREATED = 201;
 
-    private static final int NUM_THREADS = 100;
-    private static final int NUN_WARMUP_MESSAGES = 1_000;
-    private static final int NUM_SWIPE_MESSAGE = 500_000;
+    private static final int NUM_THREADS_WARM_UP = 32;
+    private static final int NUM_MESSAGES_PER_THREAD_WARM_UP = 1_000;
+    private static final int NUM_TOTAL_MESSAGE_WARM_UP = NUM_THREADS_WARM_UP * NUM_MESSAGES_PER_THREAD_WARM_UP;
+
+    private static final int NUM_THREADS_MAIN_PHASE = 500;
+    private static final int NUM_TOTAL_MESSAGE_MAIN_PHASE = 500_000;
+
 
     private static final int MAX_RETRIES = 5;
     private static final int RTT_SAMPLES = 100;
 
-    private static final int SIZE_OF_QUEUE = 50_000;
+    private static final int SIZE_OF_QUEUE = 10_000;
     private static final String CSV_FILE = "swipe_metrics.csv";
 
     // THE client
@@ -121,7 +125,7 @@ public class SwipeClient {
         return record;
     }
 
-    private static PhaseResult runPhase(int totalMessages) throws InterruptedException {
+    private static PhaseResult runPhase(int numThreads, int numMessages) throws InterruptedException {
 
         BlockingQueue<SwipeMessage> queue = new LinkedBlockingQueue<>(SIZE_OF_QUEUE);
         ConcurrentLinkedQueue<SwipeRecord> records = new ConcurrentLinkedQueue<>();
@@ -137,7 +141,7 @@ public class SwipeClient {
         // dedicated thread to generate messages into a blocking queue
         Thread generator = new Thread(() -> {
             try {
-                for (int i = 0; i < totalMessages; i++) {
+                for (int i = 0; i < numMessages; i++) {
                     queue.put(SwipeMessage.randomMessage());
                 }
             } catch (InterruptedException e) {
@@ -148,11 +152,11 @@ public class SwipeClient {
         // don't forget to .join() later
 
         // thread pool for ingesting
-        ExecutorService pool = Executors.newFixedThreadPool(NUM_THREADS);
+        ExecutorService pool = Executors.newFixedThreadPool(numThreads);
         long start = System.currentTimeMillis();
-        for (int i = 0; i < NUM_THREADS; i++) {
+        for (int i = 0; i < numThreads; i++) {
             pool.submit(() -> {
-                while (!Thread.currentThread().isInterrupted() && claimed.getAndIncrement() < totalMessages) {
+                while (!Thread.currentThread().isInterrupted() && claimed.getAndIncrement() < numMessages) {
                     SwipeMessage message;
 
                     try {
@@ -286,10 +290,10 @@ public class SwipeClient {
         double[] rtt = measureRtt(); // one time test
         double coldMs = rtt[0];
         double warmMs = rtt[1];
-        double predicted = NUM_THREADS / (warmMs / 1000.0);
+        double predicted = NUM_THREADS_MAIN_PHASE / (warmMs / 1000.0);
 
-        PhaseResult warmupResult = runPhase(NUN_WARMUP_MESSAGES);   // its records are not used for the stats or CSV
-        PhaseResult runResult = runPhase(NUM_SWIPE_MESSAGE);
+        PhaseResult warmupResult = runPhase(NUM_THREADS_WARM_UP, NUM_TOTAL_MESSAGE_WARM_UP);   // its records are not used for the stats or CSV
+        PhaseResult runResult = runPhase(NUM_THREADS_MAIN_PHASE, NUM_TOTAL_MESSAGE_MAIN_PHASE);
 
         System.out.println("=== Ingest path ===");
         // warm up
@@ -303,7 +307,7 @@ public class SwipeClient {
         System.out.println("Retries: " + runResult.retries);
         System.out.println("connection errors (IO/timeout): " + runResult.connectionErrors + "\n");
 
-        System.out.println("Worker threads: " + NUM_THREADS);
+        System.out.println("Worker threads: " + NUM_THREADS_MAIN_PHASE);
         System.out.println("Wall-clock runtime (main run): " + runResult.elapsedMs + " ms");
         System.out.println("Wall-clock runtime (warmup + main): " + (warmupResult.elapsedMs + runResult.elapsedMs) + " ms\n");
 
@@ -320,7 +324,7 @@ public class SwipeClient {
         System.out.println("=== Little's Law ===");
         System.out.println("Single-swipe RTT: first request (incl. connection setup) " + String.format(Locale.ROOT, "%.1f", coldMs)
                 + " ms, warm average " + String.format(Locale.ROOT, "%.1f", warmMs) + " ms");
-        System.out.println("Predicted max throughput = L / W = " + NUM_THREADS + " / "
+        System.out.println("Predicted max throughput = L / W = " + NUM_THREADS_MAIN_PHASE + " / "
                 + String.format(Locale.ROOT, "%.4f", warmMs / 1000.0) + " s = " + String.format(Locale.ROOT, "%.1f", predicted) + " swipes/s");
         System.out.println("Actual: " + String.format(Locale.ROOT, "%.1f", runResult.throughput()) + " swipes/s ("
                 + String.format(Locale.ROOT, "%.0f", runResult.throughput() / predicted * 100) + "% of predicted)\n");

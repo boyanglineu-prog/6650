@@ -30,8 +30,8 @@ public class SubscribeClient {
     private static final int NUM_SUBSCRIBERS = 10; // one per resortID: 1 - 10
     private static final int DEFAULT_RUN_SECONDS = 300; // standalone run length; SwipeClient controls it when used together
     private static final long MAX_BACKOFF_MS = 30_000;
-    //    private static final String URL = "ws://localhost:8080/ski-servlet/leaderboard/";
-    private static final String URL = "ws://16.148.133.255:8080/ski-servlet/leaderboard/";
+//    private static final String URL = "ws://localhost:8080/ski-servlet/leaderboard/";
+    private static final String URL = "ws://32.191.63.101:8080/ski-servlet/leaderboard/";
 
     // shared by all connections (callbacks arrive on different threads, so everything is thread-safe)
     private static final ScheduledExecutorService scheduler =
