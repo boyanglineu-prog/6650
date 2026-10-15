@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# secrets: never commit keys
+*.pem
+*.key
+
+# client build output and downloaded jars (created by the README's run steps)
+out/
+libs/
+*.class
+
+# Maven / IntelliJ
+target/
+.idea/
+*.iml
